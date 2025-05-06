@@ -1,6 +1,6 @@
-import resolve from '@rollup/plugin-node-resolve';
-import commonjs from '@rollup/plugin-commonjs';
-import dts from 'rollup-plugin-dts';
+import resolve from '@rollup/plugin-node-resolve'
+import commonjs from '@rollup/plugin-commonjs'
+import dts from 'rollup-plugin-dts'
 
 export default [
   {
@@ -16,4 +16,4 @@ export default [
     output: [{ file: 'dist/index.d.ts', format: 'es' }],
     plugins: [dts()]
   }
-];
+]

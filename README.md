@@ -44,7 +44,7 @@ import {
 ```tsx
 import React from "react";
 import ReactDOM from "react-dom";
-import { QueryClientProvider, queryClient } from "light-query";
+import { QueryClientProvider, queryClient, QueryStatus } from "light-query";
 import App from "./App";
 
 ReactDOM.render(
@@ -70,8 +70,9 @@ function Todos() {
     refetchInterval: 1000 * 30, // Auto-refetch every 30 seconds
   });
 
-  if (status === "loading") return <p>Loading...</p>;
-  if (status === "error") return <p>Error: {(error as Error).message}</p>;
+  if (status === QueryStatus.Loading) return <p>Loading...</p>;
+  if (status === QueryStatus.Error)
+    return <p>Error: {(error as Error).message}</p>;
 
   return (
     <div>

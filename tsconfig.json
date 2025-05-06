@@ -1,5 +1,18 @@
 {
   "compilerOptions": {
+    "baseUrl": "src",
+    "paths": {
+"@types": ["types"],
+      "@types/*": ["types/*"],
+"@utils": ["utils"],
+      "@utils/*": ["utils/*"],
+"@core": ["core"],
+      "@core/*": ["core/*"],
+"@hooks": ["hooks"],
+      "@hooks/*": ["hooks/*"],
+"@react": ["react"],
+      "@react/*": ["react/*"]
+    },
     "declaration": true,
     "outDir": "dist",
     "module": "ESNext",

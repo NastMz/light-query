@@ -1,0 +1,30 @@
+{
+  "name": "light-query",
+  "version": "1.0.0",
+  "description": "Light-query is a minimal, from-scratch React data-fetching library inspired by TanStack Query. It provides easy-to-use hooks for queries, mutations, and infinite scrolling with configurable caching, stale-time, retry logic, and optional React Suspense support.",
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "rollup -c",
+    "prepare": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NastMz/light-query.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/NastMz/light-query/issues"
+  },
+  "homepage": "https://github.com/NastMz/light-query#readme",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^28.0.3",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "rollup": "^4.40.2",
+    "rollup-plugin-dts": "^6.2.1",
+    "typescript": "^5.8.3"
+  }
+}

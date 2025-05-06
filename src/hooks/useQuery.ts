@@ -1,5 +1,5 @@
 // src/hooks/useQuery.ts
-import { useState, useEffect, useContext } from 'react'
+import { useEffect, useContext, useState } from 'react'
 import { Query } from '@core/Query'
 import { QueryState, QueryOptions, QueryStatus } from '@types'
 import { QueryClient } from '@core/QueryClient'
@@ -24,15 +24,34 @@ export function useQuery<T> (options: QueryOptions<T>): QueryState<T> & { refetc
     cache.set(key, query)
   }
 
-  // Local state sync
-  const [state, setState] = useState<QueryState<T>>(query.state)
+  // Local React state for query result
+  const [state, setState] = useState<QueryState<T>>({
+    status: QueryStatus.Loading,
+    data: undefined,
+    error: undefined,
+    updatedAt: 0
+  })
 
+  // Fetch data on mount or when key changes
   useEffect(() => {
-    const onChange = (): void => setState({ ...query.state })
-    query.subscribe(onChange)
-    void query.fetch() // fetch on mount or key change
-    return () => query.unsubscribe(onChange)
+    let isMounted = true
+    setState(prev => ({ ...prev, status: QueryStatus.Loading }))
+    void query.fetch().then(() => {
+      if (isMounted) {
+        const s = query.state
+        setState({ status: s.status, data: (s.data as T), error: s.error, updatedAt: s.updatedAt })
+      }
+    })
+    return () => { isMounted = false }
   }, [key])
+
+  // Manual refetch
+  const refetch = async (): Promise<void> => {
+    setState(prev => ({ ...prev, status: QueryStatus.Loading }))
+    await query.fetch()
+    const s = query.state
+    setState({ status: s.status, data: (s.data as T), error: s.error, updatedAt: s.updatedAt })
+  }
 
   // Suspense integration
   if (options.suspense === true && state.status === QueryStatus.Loading) {
@@ -43,5 +62,5 @@ export function useQuery<T> (options: QueryOptions<T>): QueryState<T> & { refetc
     throw state.error
   }
 
-  return { ...state, refetch: async () => await query.fetch() }
+  return { ...state, refetch }
 }

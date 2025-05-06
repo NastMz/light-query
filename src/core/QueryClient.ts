@@ -38,6 +38,9 @@ export class QueryClient {
     if (query == null) {
       query = new Query<T>(key, options)
       this.cache.set(key, query)
+    } else if (options.staleTime !== undefined) {
+      // update staleTime if provided to respect new options
+      query.options.staleTime = options.staleTime
     }
     await query.fetch()
     if (query.state.data === null || query.state.data === undefined) {
@@ -90,9 +93,15 @@ export class QueryClient {
     const tasks: Array<Promise<void>> = []
     for (const [key, query] of this.cache.entries()) {
       if (keyPart === undefined || QueryClient.matchKey(key, keyPart)) {
+        // force stale to refetch even with infinite staleTime
         query.state.updatedAt = 0
-        // refetch and catch errors to avoid unhandled rejections
-        tasks.push(query.fetch().catch(() => {}))
+        const originalStale = query.options.staleTime
+        query.options.staleTime = 0
+        // refetch and restore staleTime, catch errors to avoid unhandled rejections
+        const task = query.fetch()
+          .catch(() => {})
+          .finally(() => { query.options.staleTime = originalStale })
+        tasks.push(task)
       }
     }
     await Promise.all(tasks)

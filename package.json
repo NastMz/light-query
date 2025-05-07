@@ -1,6 +1,7 @@
 {
   "name": "light-query",
   "version": "1.0.0",
+  "type": "module",
   "description": "Light-query is a minimal, from-scratch React data-fetching library inspired by TanStack Query. It provides easy-to-use hooks for queries, mutations, and infinite scrolling with configurable caching, stale-time, retry logic, and optional React Suspense support.",
   "main": "dist/index.cjs.js",
   "module": "dist/index.esm.js",
@@ -26,6 +27,7 @@
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.3",
     "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-typescript": "^12.1.2",
     "@testing-library/react": "^16.3.0",
     "@testing-library/react-hooks": "^8.0.1",
     "@types/react": "^19.1.3",

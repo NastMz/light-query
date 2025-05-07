@@ -1,7 +1,7 @@
 // src/core/Query.ts
 import { retry } from '@utils/retry'
 import { QueryFn, QueryState, QueryOptions, QueryStatus } from '@types'
-import { QueryClient } from '@core/QueryClient'
+import { QueryCache } from '@core/QueryCache'
 
 /**
  * Manages fetching, caching, stale logic, retries, and subscriptions for one query key.
@@ -19,7 +19,7 @@ export class Query<T> {
   state: QueryState<T>
 
   private readonly subscribers = new Set<() => void>()
-  private cacheTimer?: ReturnType<typeof setTimeout>
+  private readonly cacheTimer?: ReturnType<typeof setTimeout>
   private readonly intervalId?: ReturnType<typeof setInterval>
 
   constructor (key: string, options: QueryOptions<T>) {
@@ -56,10 +56,8 @@ export class Query<T> {
   unsubscribe (cb: () => void): void {
     this.subscribers.delete(cb)
     if (this.subscribers.size === 0) {
-      this.cacheTimer = setTimeout(() => {
-        QueryClient.getQueryCache().remove(this.key)
-      }, this.options.cacheTime)
-      if (this.intervalId !== null) clearInterval(this.intervalId)
+      QueryCache.getInstance().scheduleCleanup(this.key, this.options.cacheTime)
+      if (this.intervalId) clearInterval(this.intervalId)
     }
   }
 

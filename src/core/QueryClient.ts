@@ -7,7 +7,7 @@ import { QueryOptions, MutationOptions, QueryKey } from '@types'
  * Singleton client for fetching and mutating queries.
  */
 export class QueryClient {
-  private readonly cache = new QueryCache()
+  private readonly cache = QueryCache.getInstance()
   private static _instance: QueryClient
 
   /** Get or create the global client */

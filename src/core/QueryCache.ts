@@ -6,6 +6,12 @@ import { Query } from '@core/Query'
  */
 export class QueryCache {
   private readonly cache = new Map<string, Query<any>>()
+  private static _instance: QueryCache
+
+  static getInstance (): QueryCache {
+    this._instance ??= new QueryCache()
+    return this._instance
+  }
 
   /**
    * Retrieve a Query by key.
@@ -34,5 +40,12 @@ export class QueryCache {
    */
   entries (): Array<[string, Query<any>]> {
     return Array.from(this.cache.entries())
+  }
+
+  /**
+   * Clear the cache.
+   */
+  scheduleCleanup (key: string, timeout: number): void {
+    setTimeout(() => this.cache.delete(key), timeout)
   }
 }

@@ -38,9 +38,9 @@ export class QueryClient {
     if (query == null) {
       query = new Query<T>(key, options)
       this.cache.set(key, query)
-    } else if (options.staleTime !== undefined) {
-      // update staleTime if provided to respect new options
-      query.options.staleTime = options.staleTime
+    } else {
+      // Use the updateOptions method for existing queries
+      query.updateOptions(options)
     }
     await query.fetch()
     if (query.state.data === null || query.state.data === undefined) {
@@ -91,20 +91,40 @@ export class QueryClient {
    */
   async invalidateQueries (keyPart?: QueryKey): Promise<void> {
     const tasks: Array<Promise<void>> = []
+    const affectedQueries: string[] = []
+
     for (const [key, query] of this.cache.entries()) {
       if (keyPart === undefined || QueryClient.matchKey(key, keyPart)) {
+        // Store affected query keys for later notification
+        affectedQueries.push(key)
+
         // force stale to refetch even with infinite staleTime
         query.state.updatedAt = 0
         const originalStale = query.options.staleTime
         query.options.staleTime = 0
+
         // refetch and restore staleTime, catch errors to avoid unhandled rejections
         const task = query.fetch()
-          .catch(() => {})
-          .finally(() => { query.options.staleTime = originalStale })
+          .catch((error) => {
+            console.error(`Error refetching query ${key}:`, error)
+          })
+          .finally(() => {
+            query.options.staleTime = originalStale
+            // Notify subscribers after fetch completion (success or error)
+            query.forceNotify()
+          })
+
         tasks.push(task)
       }
     }
+
+    // Wait for all refetches to complete
     await Promise.all(tasks)
+
+    // Force notification to ensure UI updates after all refetches complete
+    for (const key of affectedQueries) {
+      this.cache.notifyQueryChange(key)
+    }
   }
 
   /**

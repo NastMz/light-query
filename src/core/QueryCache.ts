@@ -48,4 +48,14 @@ export class QueryCache {
   scheduleCleanup (key: string, timeout: number): void {
     setTimeout(() => this.cache.delete(key), timeout)
   }
+
+  /**
+   * Force notify subscribers of a specific query
+   */
+  notifyQueryChange (key: string): void {
+    const query = this.get(key)
+    if (query !== undefined) {
+      query.forceNotify()
+    }
+  }
 }

@@ -19,7 +19,8 @@ export class Query<T> {
   state: QueryState<T>
 
   private readonly subscribers = new Set<() => void>()
-  private readonly cacheTimer?: ReturnType<typeof setTimeout>
+  // Timer ID for scheduled cache cleanup when no subscribers
+  private cacheTimer?: ReturnType<typeof setTimeout>
   private readonly intervalId?: ReturnType<typeof setInterval>
 
   constructor (key: string, options: QueryOptions<T>) {
@@ -55,7 +56,10 @@ export class Query<T> {
   subscribe (cb: () => void): void {
     this.subscribers.add(cb)
     // If someone re-subscribed, cancel any scheduled cleanup
-    if (this.cacheTimer !== null) clearTimeout(this.cacheTimer)
+    if (this.cacheTimer !== undefined) {
+      clearTimeout(this.cacheTimer)
+      this.cacheTimer = undefined
+    }
   }
 
   /**
@@ -64,7 +68,8 @@ export class Query<T> {
   unsubscribe (cb: () => void): void {
     this.subscribers.delete(cb)
     if (this.subscribers.size === 0) {
-      QueryCache.getInstance().scheduleCleanup(this.key, this.options.cacheTime)
+      // Schedule removing this query from cache after cacheTime
+      this.cacheTimer = setTimeout(() => QueryCache.getInstance().remove(this.key), this.options.cacheTime)
       if (this.intervalId !== null) clearInterval(this.intervalId)
     }
   }

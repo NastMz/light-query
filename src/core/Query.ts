@@ -35,9 +35,17 @@ export class Query<T> {
     }
     this.state = { status: QueryStatus.Idle, updatedAt: 0 }
 
-    // Set up automatic refetching if requested
+    // Set up automatic refetching if requested, bypass staleTime on each interval
     if (this.options.refetchInterval > 0) {
-      this.intervalId = setInterval(async () => await this.fetch(), this.options.refetchInterval)
+      this.intervalId = setInterval(async () => {
+        const original = this.options.staleTime
+        this.options.staleTime = 0
+        try {
+          await this.fetch()
+        } finally {
+          this.options.staleTime = original
+        }
+      }, this.options.refetchInterval)
     }
   }
 
@@ -57,7 +65,7 @@ export class Query<T> {
     this.subscribers.delete(cb)
     if (this.subscribers.size === 0) {
       QueryCache.getInstance().scheduleCleanup(this.key, this.options.cacheTime)
-      if (this.intervalId) clearInterval(this.intervalId)
+      if (this.intervalId !== null) clearInterval(this.intervalId)
     }
   }
 

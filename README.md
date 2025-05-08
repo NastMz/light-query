@@ -57,32 +57,7 @@ npm install
 npm run build
 ```
 
-### 4. Link locally with `npm link`
-
-```bash
-# In your light-query repo
-npm link
-
-# In your consuming app
-cd ../mi-app
-npm link light-query
-```
-
-You can now import:
-
-```ts
-import {
-  useQuery,
-  useMutation,
-  useInfiniteQuery,
-  QueryClientProvider,
-  queryClient,
-} from "light-query";
-```
-
-### Alternative: File-based installation
-
-If you prefer to ship `dist/` and `package.json` into your app without linking:
+### 4. File-based installation
 
 1. Copy `dist/` and `package.json` into your project (e.g. `./lib/light-query`).
 2. In your app’s `package.json`:

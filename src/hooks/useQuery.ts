@@ -24,25 +24,21 @@ export function useQuery<T> (options: QueryOptions<T>): QueryState<T> & { refetc
     cache.set(key, query)
   }
 
-  // Local React state for query result
-  const [state, setState] = useState<QueryState<T>>({
-    status: QueryStatus.Loading,
-    data: undefined,
-    error: undefined,
-    updatedAt: 0
-  })
+  // Local React state for query result initialized from query
+  const [state, setState] = useState<QueryState<T>>(() => query.state)
 
-  // Fetch data on mount or when key changes
+  // Subscribe to query updates and fetch on mount or when key changes
   useEffect(() => {
-    let isMounted = true
-    setState(prev => ({ ...prev, status: QueryStatus.Loading }))
-    void query.fetch().then(() => {
-      if (isMounted) {
-        const s = query.state
-        setState({ status: s.status, data: (s.data as T), error: s.error, updatedAt: s.updatedAt })
-      }
-    })
-    return () => { isMounted = false }
+    const handleUpdate = (): void => {
+      const s = query.state
+      setState({ status: s.status, data: (s.data as T), error: s.error, updatedAt: s.updatedAt })
+    }
+    // Subscribe to updates
+    query.subscribe(handleUpdate)
+    // Trigger initial fetch
+    void query.fetch()
+    // Cleanup subscription on unmount or key change
+    return () => { query.unsubscribe(handleUpdate) }
   }, [key])
 
   // Manual refetch

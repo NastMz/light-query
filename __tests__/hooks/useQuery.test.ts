@@ -134,6 +134,56 @@ describe('useQuery hook', () => {
     }, { timeout: 200 });
   });
 
+  it('should refetch updated data at intervals', async () => {
+    let responseData = [{ id: 1, title: 'Initial' }];
+    
+    const queryFn = vi.fn(() => 
+      Promise.resolve(responseData)
+    );
+
+    const { result } = renderHook(() => useQuery({
+      queryKey: ['todos-interval'],
+      queryFn,
+      refetchInterval: 50, // 50ms for faster test
+    }));
+
+    // Wait for initial fetch
+    await waitFor(() => {
+      expect(result.current.status).toBe(QueryStatus.Success);
+    });
+
+    expect(result.current.data).toEqual([{ id: 1, title: 'Initial' }]);
+    
+    // Reset call count after initial fetch to track only interval calls
+    const initialCallCount = queryFn.mock.calls.length;
+
+    // Update the data that will be returned by the next fetch
+    responseData = [{ id: 2, title: 'Updated' }];
+
+    // Wait for interval refetch
+    await waitFor(() => {
+      expect(queryFn).toHaveBeenCalledTimes(initialCallCount + 1);
+    }, { timeout: 100 });
+
+    // Wait for the data to be updated
+    await waitFor(() => {
+      expect(result.current.data).toEqual([{ id: 2, title: 'Updated' }]);
+    }, { timeout: 100 });
+
+    // Update data again
+    responseData = [{ id: 3, title: 'Updated Again' }];
+
+    // Wait for another interval refetch
+    await waitFor(() => {
+      expect(queryFn).toHaveBeenCalledTimes(initialCallCount + 2);
+    }, { timeout: 100 });
+
+    // Wait for the data to be updated again
+    await waitFor(() => {
+      expect(result.current.data).toEqual([{ id: 3, title: 'Updated Again' }]);
+    }, { timeout: 100 });
+  });
+
   it('should handle errors properly', async () => {
     const queryFn = vi.fn(() => 
       Promise.reject(new Error('Test error'))

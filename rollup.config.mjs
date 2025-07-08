@@ -14,7 +14,8 @@ const aliasEntries = [
   { find: '@types', replacement: path.resolve(__dirname, 'src/types') },
   { find: '@hooks', replacement: path.resolve(__dirname, 'src/hooks') },
   { find: '@react', replacement: path.resolve(__dirname, 'src/react') },
-  { find: '@utils', replacement: path.resolve(__dirname, 'src/utils') }
+  { find: '@utils', replacement: path.resolve(__dirname, 'src/utils') },
+  { find: '@test-utils', replacement: path.resolve(__dirname, 'src/test-utils') }
 ]
 
 export default [

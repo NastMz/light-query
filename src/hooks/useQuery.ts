@@ -14,7 +14,19 @@ import { QueryClientContext } from '@react/QueryClientProvider'
  */
 export function useQuery<T> (options: QueryOptions<T>): QueryState<T> & { refetch: () => Promise<void> } {
   const client = useContext(QueryClientContext) ?? QueryClient.getInstance()
-  const key = JSON.stringify(options.queryKey)
+
+  // Merge with client's default options
+  const mergedOptions: QueryOptions<T> = {
+    staleTime: 0,
+    cacheTime: 5 * 60_000,
+    retry: 0,
+    retryDelay: 1000,
+    refetchInterval: 0,
+    suspense: false,
+    ...options
+  }
+
+  const key = JSON.stringify(mergedOptions.queryKey)
 
   // Get or create the Query instance from the provided client
   const cache = client.getQueryCache()
@@ -22,15 +34,21 @@ export function useQuery<T> (options: QueryOptions<T>): QueryState<T> & { refetc
 
   // If no existing query, create a new one
   if (query == null) {
-    query = new Query<T>(key, options)
+    query = new Query<T>(key, mergedOptions)
     cache.set(key, query)
   } else {
     // Update options on existing query
-    query.updateOptions(options)
+    query.updateOptions(mergedOptions)
   }
 
   // Local React state for query result
-  const [state, setState] = useState<QueryState<T>>(() => ({ ...query.state }))
+  const [state, setState] = useState<QueryState<T>>(() => {
+    // Start with loading state if this is a new query
+    if (query.state.status === QueryStatus.Idle) {
+      return { ...query.state, status: QueryStatus.Loading }
+    }
+    return { ...query.state }
+  })
 
   // Manual refetch (force bypassing staleTime)
   const refetch = useCallback(async (): Promise<void> => {
@@ -74,12 +92,37 @@ export function useQuery<T> (options: QueryOptions<T>): QueryState<T> & { refetc
   }, [key, query])
 
   // Suspense integration
-  if (options.suspense === true && state.status === QueryStatus.Loading) {
-    // eslint-disable-next-line @typescript-eslint/no-throw-literal
-    throw query.fetch()
-  }
-  if (options.suspense === true && state.status === QueryStatus.Error) {
-    throw state.error
+  if (options.suspense === true) {
+    if (state.status === QueryStatus.Loading) {
+      // Create a promise that resolves when the query completes
+      const suspensePromise = new Promise((resolve, reject) => {
+        const unsubscribe = (): void => {
+          query.unsubscribe(handleStateChange)
+        }
+
+        const handleStateChange = (): void => {
+          if (query.state.status === QueryStatus.Success) {
+            unsubscribe()
+            resolve(query.state.data)
+          } else if (query.state.status === QueryStatus.Error) {
+            unsubscribe()
+            const error = query.state.error instanceof Error
+              ? query.state.error
+              : new Error(String(query.state.error))
+            reject(error)
+          }
+        }
+
+        query.subscribe(handleStateChange)
+      })
+
+      // eslint-disable-next-line @typescript-eslint/no-throw-literal
+      throw suspensePromise
+    }
+
+    if (state.status === QueryStatus.Error) {
+      throw state.error
+    }
   }
 
   return { ...state, refetch }

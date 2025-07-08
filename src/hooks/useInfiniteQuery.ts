@@ -37,20 +37,31 @@ export function useInfiniteQuery<T> (
   const client = ctxClient ?? QueryClient.getInstance()
   const key = JSON.stringify(options.queryKey)
 
+  // Merge with default options
+  const mergedOptions = {
+    staleTime: 0,
+    cacheTime: 5 * 60_000,
+    retry: 0,
+    retryDelay: 1000,
+    refetchInterval: 0,
+    suspense: false,
+    ...options
+  }
+
   const [pages, setPages] = useState<T[]>([])
   const [state, setState] = useState<QueryState<T>>({ status: QueryStatus.Idle, updatedAt: 0 })
 
   // Fetch one page
   const fetchPage = async (pageParam?: any): Promise<T> => {
     return await client.fetchQuery({
-      queryKey: [...options.queryKey, pageParam],
-      queryFn: async () => await options.queryFn({ pageParam, queryKey: key }),
-      staleTime: options.staleTime,
-      cacheTime: options.cacheTime,
-      retry: options.retry,
-      retryDelay: options.retryDelay,
-      refetchInterval: options.refetchInterval,
-      suspense: options.suspense
+      queryKey: [...mergedOptions.queryKey, pageParam],
+      queryFn: async () => await mergedOptions.queryFn({ pageParam, queryKey: key }),
+      staleTime: mergedOptions.staleTime,
+      cacheTime: mergedOptions.cacheTime,
+      retry: mergedOptions.retry,
+      retryDelay: mergedOptions.retryDelay,
+      refetchInterval: mergedOptions.refetchInterval,
+      suspense: mergedOptions.suspense
     })
   }
 
@@ -64,8 +75,11 @@ export function useInfiniteQuery<T> (
 
   // Initial load
   useEffect(() => {
+    // Reset state when key changes
+    setPages([])
+    setState({ status: QueryStatus.Loading, updatedAt: 0 })
+
     void (async (): Promise<void> => {
-      setState({ status: QueryStatus.Loading, updatedAt: 0 })
       try {
         const first = await fetchPage()
         setPages([first])

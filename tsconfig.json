@@ -13,7 +13,9 @@
       "@react": ["react"],
       "@react/*": ["react/*"],
       "@mocks": ["mocks"],
-      "@mocks/*": ["mocks/*"]
+      "@mocks/*": ["mocks/*"],
+      "@test-utils": ["test-utils"],
+      "@test-utils/*": ["test-utils/*"]
     },
     "declaration": true,
     "outDir": "dist",

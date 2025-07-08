@@ -4,14 +4,31 @@
  */
 
 /**
+ * Custom error class for query-related errors.
+ */
+export class QueryError extends Error {
+  constructor (
+    message: string,
+    public readonly queryKey: QueryKey,
+    public readonly originalError?: unknown
+  ) {
+    super(message)
+    this.name = 'QueryError'
+
+    // Ensure proper prototype chain for instanceof checks
+    Object.setPrototypeOf(this, QueryError.prototype)
+  }
+}
+
+/**
  * A unique cache key for a query.
  */
 export type QueryKey = string | any[]
 
 /**
- * A function returning a Promise of data.
+ * A function returning a Promise of data with optional AbortSignal.
  */
-export type QueryFn<T> = () => Promise<T>
+export type QueryFn<T> = (context?: { signal?: AbortSignal }) => Promise<T>
 
 /**
  * Possible statuses for queries and mutations.
@@ -65,4 +82,19 @@ export interface MutationOptions<TData, TVariables> {
   mutationFn: MutationFn<TData, TVariables>
   onSuccess?: (data: TData) => void // Callback on success
   onError?: (error: unknown) => void // Callback on error
+}
+
+/**
+ * Global configuration for QueryClient
+ */
+export interface QueryClientConfig {
+  defaultOptions?: {
+    queries?: Partial<Omit<QueryOptions<any>, 'queryKey' | 'queryFn'>>
+    mutations?: Partial<Omit<MutationOptions<any, any>, 'mutationFn'>>
+  }
+  maxCacheSize?: number
+  logger?: {
+    error?: (message: string, meta?: any) => void
+    warn?: (message: string, meta?: any) => void
+  }
 }

@@ -1,18 +1,42 @@
 // src/core/QueryClient.ts
 import { QueryCache } from '@core/QueryCache'
 import { Query } from '@core/Query'
-import { QueryOptions, MutationOptions, QueryKey } from '@types'
+import { QueryOptions, MutationOptions, QueryKey, QueryClientConfig, QueryState, QueryStatus } from '@types'
 
 /**
  * Singleton client for fetching and mutating queries.
  */
 export class QueryClient {
   private readonly cache = QueryCache.getInstance()
+  private readonly config: QueryClientConfig
   private static _instance: QueryClient
+  private readonly activeMutations = new Set<string>()
+  private readonly mutationSubscribers = new Set<() => void>()
+
+  constructor (config: QueryClientConfig = {}) {
+    this.config = {
+      defaultOptions: {
+        queries: {
+          staleTime: 0,
+          cacheTime: 5 * 60_000,
+          retry: 0,
+          retryDelay: 1000,
+          refetchInterval: 0,
+          suspense: false,
+          ...config.defaultOptions?.queries
+        },
+        mutations: {
+          ...config.defaultOptions?.mutations
+        }
+      },
+      maxCacheSize: config.maxCacheSize,
+      logger: config.logger
+    }
+  }
 
   /** Get or create the global client */
-  static getInstance (): QueryClient {
-    this._instance ??= new QueryClient()
+  static getInstance (config?: QueryClientConfig): QueryClient {
+    this._instance ??= new QueryClient(config)
     return this._instance
   }
 
@@ -33,15 +57,27 @@ export class QueryClient {
    * @template T
    */
   async fetchQuery<T>(options: QueryOptions<T>): Promise<T> {
-    const key = JSON.stringify(options.queryKey)
+    // Merge with default options
+    const mergedOptions: QueryOptions<T> = {
+      ...this.config.defaultOptions?.queries,
+      ...options
+    }
+
+    const key = JSON.stringify(mergedOptions.queryKey)
     let query = this.cache.get<T>(key)
     if (query == null) {
-      query = new Query<T>(key, options)
+      query = new Query<T>(key, mergedOptions)
       this.cache.set(key, query)
     } else {
       // Use the updateOptions method for existing queries
-      query.updateOptions(options)
+      query.updateOptions(mergedOptions)
     }
+
+    // Check cache size limit
+    if (this.config.maxCacheSize != null && this.cache.size() > this.config.maxCacheSize) {
+      this.config.logger?.warn?.('Cache size limit exceeded', { size: this.cache.size(), limit: this.config.maxCacheSize })
+    }
+
     await query.fetch()
     if (query.state.data === null || query.state.data === undefined) {
       throw new Error('Query data is null or undefined')
@@ -134,6 +170,10 @@ export class QueryClient {
     options: MutationOptions<TData, TVariables>,
     variables: TVariables
   ): Promise<TData> {
+    const mutationId = `${Date.now()}-${Math.random()}`
+    this.activeMutations.add(mutationId)
+    this.notifyMutationSubscribers()
+
     try {
       const data = await options.mutationFn(variables)
       options.onSuccess?.(data)
@@ -141,7 +181,108 @@ export class QueryClient {
     } catch (error) {
       options.onError?.(error)
       throw error
+    } finally {
+      this.activeMutations.delete(mutationId)
+      this.notifyMutationSubscribers()
     }
+  }
+
+  /**
+   * Get all queries that match a key pattern
+   */
+  getQueries (keyPart?: QueryKey): Array<{ key: string, state: QueryState<any> }> {
+    const results: Array<{ key: string, state: QueryState<any> }> = []
+
+    for (const [key, query] of this.cache.entries()) {
+      if (keyPart === undefined || QueryClient.matchKey(key, keyPart)) {
+        results.push({ key, state: query.state })
+      }
+    }
+
+    return results
+  }
+
+  /**
+   * Cancel all queries that match a key pattern
+   */
+  cancelQueries (keyPart?: QueryKey): void {
+    for (const [key, query] of this.cache.entries()) {
+      if (keyPart === undefined || QueryClient.matchKey(key, keyPart)) {
+        query.cancel()
+      }
+    }
+  }
+
+  /**
+   * Set query data directly in the cache
+   */
+  setQueryData<T>(queryKey: QueryKey, data: T | ((oldData: T | undefined) => T)): void {
+    const key = JSON.stringify(queryKey)
+    let query = this.cache.get<T>(key)
+
+    if (query == null) {
+      query = new Query<T>(key, {
+        queryKey,
+        queryFn: async () => await Promise.resolve(data instanceof Function ? data(undefined) : data),
+        ...this.config.defaultOptions?.queries
+      })
+      this.cache.set(key, query)
+    }
+
+    const newData = data instanceof Function ? data(query.state.data) : data
+    query.state = {
+      data: newData,
+      status: QueryStatus.Success,
+      updatedAt: Date.now()
+    }
+    query.forceNotify()
+  }
+
+  /**
+   * Get query data from cache
+   */
+  getQueryData<T>(queryKey: QueryKey): T | undefined {
+    const key = JSON.stringify(queryKey)
+    const query = this.cache.get<T>(key)
+    return query?.state.data
+  }
+
+  /**
+   * Get the number of active mutations
+   */
+  getActiveMutationCount (): number {
+    return this.activeMutations.size
+  }
+
+  /**
+   * Clear all cached queries and active mutations
+   */
+  clear (): void {
+    this.cache.clear()
+    this.activeMutations.clear()
+  }
+
+  /**
+   * Subscribe to mutation count changes
+   */
+  subscribeToMutations (callback: () => void): () => void {
+    this.mutationSubscribers.add(callback)
+    return () => {
+      this.mutationSubscribers.delete(callback)
+    }
+  }
+
+  /**
+   * Notify mutation subscribers
+   */
+  private notifyMutationSubscribers (): void {
+    this.mutationSubscribers.forEach(callback => {
+      try {
+        callback()
+      } catch (error) {
+        this.config.logger?.error?.('Error in mutation subscriber:', error)
+      }
+    })
   }
 }
 

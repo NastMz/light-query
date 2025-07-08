@@ -23,6 +23,10 @@ export class Query<T> {
   private cacheTimer?: ReturnType<typeof setTimeout>
   private intervalId?: ReturnType<typeof setInterval>
   private isRefetching = false
+  private abortController?: AbortController
+  // Batch notification system
+  private pendingNotification = false
+  private notificationTimer?: ReturnType<typeof setTimeout>
 
   constructor (key: string, options: QueryOptions<T>) {
     this.key = key
@@ -51,10 +55,13 @@ export class Query<T> {
       this.intervalId = undefined
     }
 
-    // Set up new interval if configured
+    // Set up new interval if configured and there are active subscribers
     if (this.options.refetchInterval > 0) {
       this.intervalId = setInterval(() => {
-        void this.refetchWithoutStale()
+        // Only refetch if there are active subscribers and not already refetching
+        if (this.subscribers.size > 0 && !this.isRefetching) {
+          void this.refetchWithoutStale()
+        }
       }, this.options.refetchInterval)
     }
   }
@@ -100,22 +107,31 @@ export class Query<T> {
     this.subscribers.delete(cb)
     if (this.subscribers.size === 0) {
       // Schedule cache removal and clear polling interval after cacheTime
+      const cache = QueryCache.getInstance()
       this.cacheTimer = setTimeout(() => {
         if (this.intervalId != null) clearInterval(this.intervalId)
-        QueryCache.getInstance().remove(this.key)
+        cache.remove(this.key)
       }, this.options.cacheTime)
     }
   }
 
   /** Notify all subscribers of state change */
   private notify (): void {
-    this.subscribers.forEach(cb => {
-      try {
-        cb()
-      } catch (err) {
-        console.error('Error in query subscriber:', err)
-      }
-    })
+    if (this.pendingNotification) return
+
+    this.pendingNotification = true
+    this.notificationTimer = setTimeout(() => {
+      this.pendingNotification = false
+      this.notificationTimer = undefined
+
+      this.subscribers.forEach(cb => {
+        try {
+          cb()
+        } catch (err) {
+          console.error('Error in query subscriber:', err)
+        }
+      })
+    }, 0)
   }
 
   /** Publicly accessible notify method to force updates */
@@ -123,38 +139,97 @@ export class Query<T> {
     this.notify()
   }
 
+  /** Cancel the current request */
+  cancel (): void {
+    if (this.abortController != null) {
+      this.abortController.abort()
+      this.abortController = undefined
+    }
+  }
+
   /**
    * Perform the fetch according to staleTime, retry logic, and Suspense config.
    */
   async fetch (): Promise<void> {
-    const now = Date.now()
-    // If already loading, skip
-    if (this.state.status === QueryStatus.Loading) return
-    // If data is still fresh, skip
-    if (this.state.updatedAt !== null && now - this.state.updatedAt < this.options.staleTime) {
-      return
+    if (this.shouldSkipFetch()) return
+
+    const signal = this.prepareForFetch()
+
+    try {
+      const data = await this.executeQuery(signal)
+      this.handleSuccess(data, signal)
+    } catch (error) {
+      this.handleError(error, signal)
+    } finally {
+      this.cleanup(signal)
     }
+
+    this.handleSuspense(signal)
+  }
+
+  private shouldSkipFetch (): boolean {
+    const now = Date.now()
+    if (this.state.status === QueryStatus.Loading) return true
+    if (this.state.updatedAt !== null && now - this.state.updatedAt < this.options.staleTime) {
+      return true
+    }
+    return false
+  }
+
+  private prepareForFetch (): AbortSignal {
+    // Cancel any existing request
+    if (this.abortController != null) {
+      this.abortController.abort()
+    }
+
+    // Create new AbortController for this request
+    this.abortController = new AbortController()
+    const signal = this.abortController.signal
 
     // Start loading
     this.state.status = QueryStatus.Loading
     this.notify()
 
-    // Execute with retry if configured
-    const call: () => Promise<T> = async () => await this.fn()
-    try {
-      const data = this.options.retry > 0
-        ? await retry(call, this.options.retry, this.options.retryDelay)
-        : await call()
+    return signal
+  }
 
+  private async executeQuery (signal: AbortSignal): Promise<T> {
+    const call: () => Promise<T> = async () => {
+      try {
+        return await this.fn({ signal })
+      } catch (error) {
+        if (signal.aborted) throw error
+        throw error
+      }
+    }
+
+    return this.options.retry > 0
+      ? await retry(call, this.options.retry, this.options.retryDelay)
+      : await call()
+  }
+
+  private handleSuccess (data: T, signal: AbortSignal): void {
+    if (!signal.aborted) {
       this.state = { data, status: QueryStatus.Success, updatedAt: Date.now() }
       this.notify()
-    } catch (error) {
+    }
+  }
+
+  private handleError (error: unknown, signal: AbortSignal): void {
+    if (!signal.aborted) {
       this.state = { error, status: QueryStatus.Error, updatedAt: Date.now() }
       this.notify()
     }
+  }
 
-    // If using Suspense, throw promise or error
-    if (this.options.suspense) {
+  private cleanup (signal: AbortSignal): void {
+    if (this.abortController != null && !signal.aborted) {
+      this.abortController = undefined
+    }
+  }
+
+  private handleSuspense (signal: AbortSignal): void {
+    if (this.options.suspense && !signal.aborted) {
       if (this.state.status === QueryStatus.Loading) throw new Error('Query is still loading')
       if (this.state.status === QueryStatus.Error) throw this.state.error
     }

@@ -145,6 +145,7 @@ export class Query<T> {
       const data = this.options.retry > 0
         ? await retry(call, this.options.retry, this.options.retryDelay)
         : await call()
+
       this.state = { data, status: QueryStatus.Success, updatedAt: Date.now() }
       this.notify()
     } catch (error) {

@@ -50,6 +50,13 @@ export class QueryCache {
   }
 
   /**
+   * Clear all cached queries.
+   */
+  clear (): void {
+    this.cache.clear()
+  }
+
+  /**
    * Force notify subscribers of a specific query
    */
   notifyQueryChange (key: string): void {

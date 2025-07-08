@@ -34,20 +34,18 @@ export function useQuery<T> (options: QueryOptions<T>): QueryState<T> & { refetc
 
   // Manual refetch (force bypassing staleTime)
   const refetch = useCallback(async (): Promise<void> => {
-    setState(prev => ({ ...prev, status: QueryStatus.Loading }))
     const originalStale = query.options.staleTime
+
+    // Force refetch by setting staleTime to 0 and updatedAt to 0
     query.options.staleTime = 0
+    query.state.updatedAt = 0
+
     try {
       await query.fetch()
-      // Update our local state with the latest query state
-      setState({ ...query.state })
+      // Don't manually set state here - let the subscription handle it
     } catch (error) {
-      // Handle error and update state
-      setState({
-        status: QueryStatus.Error,
-        error,
-        updatedAt: Date.now()
-      })
+      // Let the subscription handle errors too
+      console.error('Error in refetch:', error)
     } finally {
       query.options.staleTime = originalStale
     }

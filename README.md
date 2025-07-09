@@ -47,7 +47,6 @@ Advanced implementation features:
 ## 📦 Installation & Setup
 
 ```bash
-# Clone the repository
 npm i @nastmz/light-query
 ```
 

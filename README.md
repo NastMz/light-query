@@ -48,17 +48,7 @@ Advanced implementation features:
 
 ```bash
 # Clone the repository
-git clone https://github.com/NastMz/light-query.git
-cd light-query
-
-# Install dependencies
-npm install
-
-# Run tests
-npm test
-
-# Build the project
-npm run build
+npm i @nastmz/light-query
 ```
 
 ## 🚀 Quick Start
@@ -68,7 +58,7 @@ npm run build
 ```tsx
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { QueryClient, QueryClientProvider } from "light-query";
+import { QueryClient, QueryClientProvider } from "@nastmz/light-query";
 import App from "./App";
 
 // Create client with custom configuration
@@ -102,7 +92,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
 ```tsx
 import React from "react";
-import { useQuery } from "light-query";
+import { useQuery } from "@nastmz/light-query";
 
 interface User {
   id: number;
@@ -137,7 +127,7 @@ function UserProfile({ userId }: { userId: number }) {
 
 ```tsx
 import React, { useState } from "react";
-import { useMutation, useQueryClient } from "light-query";
+import { useMutation, useQueryClient } from "@nastmz/light-query";
 
 function CreateUser() {
   const [name, setName] = useState("");
@@ -656,7 +646,7 @@ function App() {
 ### Logging System
 
 ```tsx
-import { Logger, LogLevel } from "light-query";
+import { Logger, LogLevel } from "@nastmz/light-query";
 
 // Create a logger instance
 const logger = new Logger(LogLevel.Info);
@@ -678,7 +668,7 @@ light-query includes comprehensive testing utilities:
 ```tsx
 import { createMockQueryClient, waitForQuery } from "light-query/test-utils";
 import { render, screen, waitFor } from "@testing-library/react";
-import { QueryClientProvider } from "light-query";
+import { QueryClientProvider } from "@nastmz/light-query";
 
 describe("TodoList", () => {
   it("should render todos after loading", async () => {

@@ -4,9 +4,6 @@
 
 ![React 18+](https://img.shields.io/badge/React-18+-61DAFB?logo=react&logoColor=white)
 ![TypeScript 5.0+](https://img.shields.io/badge/TypeScript-5.0+-3178C6?logo=typescript&logoColor=white)
-![Build Status](https://img.shields.io/badge/Build-Passing-22C55E)
-![Tests](https://img.shields.io/badge/Tests-✓_All_Passing-22C55E)
-![Coverage](https://img.shields.io/badge/Coverage-95%25-22C55E)
 ![MIT License](https://img.shields.io/badge/License-MIT-blue)
 
 **Performant • Lightweight • Easy to use • Fully typed**

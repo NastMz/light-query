@@ -12,7 +12,7 @@
 
 ## 🎯 Overview
 
-**light-query** is a modern data-fetching library that provides powerful async state management for React applications. Built with TypeScript, it offers intelligent caching, request deduplication, and automatic background updates while maintaining a simple and intuitive API.
+**light-query** is a modern data-fetching library that provides powerful async state management for React applications. Built with TypeScript, it offers intelligent caching, concurrent request prevention, and automatic background updates while maintaining a simple and intuitive API.
 
 > **Note**: This library is designed for exploration and learning purposes. While fully functional and well-tested, it is not intended as a commercial solution.
 
@@ -20,29 +20,29 @@
 
 A comprehensive data-fetching solution with advanced capabilities:
 
-| Feature                     | Description                                           |
-| --------------------------- | ----------------------------------------------------- |
-| 🔄 **Queries & Mutations**  | Declarative async state management with intuitive API |
-| 🚀 **Infinite Queries**     | Built-in pagination and infinite loading support      |
-| 💾 **Smart Caching**        | Intelligent cache system with automatic invalidation  |
-| ⚡ **Performance**          | Request deduplication and batch notification system   |
-| 🎯 **TypeScript**           | Full TypeScript support with advanced type safety     |
-| 🧪 **Testing**              | Comprehensive testing utilities and mock support      |
-| 🔧 **Configuration**        | Flexible, global configuration system                 |
-| 📊 **State Tracking**       | Reactive state monitoring and global query tracking   |
-| 🚫 **Request Cancellation** | Automatic request cancellation with AbortController   |
-| ⚛️ **React Suspense**       | Native React Suspense integration                     |
+| Feature                     | Description                                                 |
+| --------------------------- | ----------------------------------------------------------- |
+| 🔄 **Queries & Mutations**  | Declarative async state management with intuitive API       |
+| 🚀 **Infinite Queries**     | Basic pagination and infinite loading support               |
+| 💾 **Smart Caching**        | Intelligent cache system with automatic invalidation        |
+| ⚡ **Performance**          | Concurrent request prevention and batch notification system |
+| 🎯 **TypeScript**           | Full TypeScript support with advanced type safety           |
+| 🧪 **Testing**              | Basic testing utilities and mock support                    |
+| 🔧 **Configuration**        | Flexible, global configuration system                       |
+| 📊 **State Tracking**       | Reactive state monitoring and global query tracking         |
+| 🚫 **Request Cancellation** | Automatic request cancellation with AbortController         |
+| ⚛️ **React Suspense**       | Native React Suspense integration                           |
 
 ### 🎨 Technical Highlights
 
 Advanced implementation features:
 
 - 📊 **State Management** - Sophisticated async state patterns and lifecycle management
-- 🔄 **Data Synchronization** - Automatic UI-server synchronization with optimistic updates
+- 🔄 **Data Synchronization** - Automatic UI-server synchronization with cache invalidation
 - 🏗️ **Architecture Design** - Modular, extensible architecture with clear separation of concerns
 - 🛠️ **TypeScript** - Advanced type system usage with generics and conditional types
-- 🧪 **Testing Patterns** - Comprehensive testing utilities for async React components
-- 🔍 **Performance Optimization** - Memory-efficient rendering with structural sharing
+- 🧪 **Testing Patterns** - Basic testing utilities for async React components
+- 🔍 **Performance Optimization** - Memory-efficient rendering with caching and concurrent request prevention
 
 ## 📦 Installation & Setup
 
@@ -100,7 +100,7 @@ interface User {
 }
 
 function UserProfile({ userId }: { userId: number }) {
-  const { data, isLoading, error, refetch } = useQuery<User>({
+  const { data, status, error, refetch } = useQuery<User>({
     queryKey: ["user", userId],
     queryFn: async ({ signal }) => {
       const response = await fetch(`/api/users/${userId}`, { signal });
@@ -109,8 +109,11 @@ function UserProfile({ userId }: { userId: number }) {
     },
   });
 
-  if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error.message}</div>;
+  if (status === "loading") return <div>Loading...</div>;
+  if (error)
+    return (
+      <div>Error: {error instanceof Error ? error.message : String(error)}</div>
+    );
 
   return (
     <div>
@@ -142,8 +145,8 @@ function CreateUser() {
       });
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries(["users"]);
+    onSuccess: async () => {
+      await queryClient.invalidateQueries(["users"]);
       setName("");
       setEmail("");
     },
@@ -184,17 +187,17 @@ function CreateUser() {
 
 light-query implements an intelligent caching system that:
 
-- **Deduplication**: Prevents duplicate requests
+- **Concurrent request prevention**: Prevents multiple simultaneous requests for the same query
 - **Automatic invalidation**: Refetches when data changes
 - **Automatic cleanup**: Removes stale data based on `cacheTime`
 - **Sharing**: Multiple components can share the same query
 
 ```tsx
 // Invalidate specific queries
-queryClient.invalidateQueries(["users"]);
+await queryClient.invalidateQueries(["users"]);
 
 // Invalidate queries starting with 'users'
-queryClient.invalidateQueries(["users"]);
+await queryClient.invalidateQueries(["users"]);
 
 // Update cache directly
 queryClient.setQueryData(["user", 1], newUserData);
@@ -203,14 +206,16 @@ queryClient.setQueryData(["user", 1], newUserData);
 ### Query States
 
 ```tsx
-const { status, isLoading, isFetching, isError, isSuccess } = useQuery({
+const { status, data, error, updatedAt } = useQuery({
   queryKey: ["data"],
   queryFn: fetchData,
 });
 
 // status can be: 'idle', 'loading', 'error', 'success'
-// isLoading: true only on initial load
-// isFetching: true during any fetch (including refetch)
+// You can derive loading states from status:
+// const isLoading = status === 'loading'
+// const isSuccess = status === 'success'
+// const isError = status === 'error'
 ```
 
 ### Query Options
@@ -258,10 +263,9 @@ Main hook for data fetching with automatic cache and state management.
 **Returns:**
 
 - `data` - The query data
-- `isLoading` - If the query is loading for the first time
-- `isFetching` - If the query is fetching (includes refetch)
 - `error` - Error if the query failed
 - `status` - Current state (`idle`, `loading`, `success`, `error`)
+- `updatedAt` - Timestamp of last successful fetch or error
 - `refetch` - Function for manual refetch
 
 #### `useMutation<TData, TVariables>(options: MutationOptions<TData, TVariables>)`
@@ -303,7 +307,7 @@ Hook to access the QueryClient and its methods.
 const queryClient = useQueryClient();
 
 // Invalidate queries
-queryClient.invalidateQueries(["users"]);
+await queryClient.invalidateQueries(["users"]);
 
 // Update cache
 queryClient.setQueryData(["user", 1], newUserData);
@@ -353,7 +357,7 @@ const queryClient = new QueryClient({
 
 #### Main Methods
 
-- `invalidateQueries(queryKey)` - Invalidate specific queries
+- `invalidateQueries(queryKey)` - Invalidate specific queries (async)
 - `cancelQueries(queryKey)` - Cancel running queries
 - `getQueryData(queryKey)` - Get data from cache
 - `setQueryData(queryKey, data)` - Update cache data
@@ -366,7 +370,7 @@ const queryClient = new QueryClient({
 ```tsx
 interface QueryOptions<T> {
   queryKey: QueryKey;
-  queryFn: (context: QueryFunctionContext) => Promise<T>;
+  queryFn: (context?: { signal?: AbortSignal }) => Promise<T>;
   staleTime?: number;
   cacheTime?: number;
   retry?: number;
@@ -383,10 +387,9 @@ interface MutationOptions<TData, TVariables> {
 
 interface QueryResult<T> {
   data: T | undefined;
-  isLoading: boolean;
-  isFetching: boolean;
-  error: Error | null;
+  error: unknown;
   status: "idle" | "loading" | "success" | "error";
+  updatedAt: number;
   refetch: () => Promise<void>;
 }
 ```
@@ -430,7 +433,11 @@ function UserProfile({ userId }: { userId: number }) {
 }
 ```
 
-### Optimistic Updates
+### Mutation Handling
+
+````tsx
+function UpdateTodo({ todo }: { todo: Todo }) {
+  const queryClient = useQueryClient();
 
 ```tsx
 function UpdateTodo({ todo }: { todo: Todo }) {
@@ -440,34 +447,24 @@ function UpdateTodo({ todo }: { todo: Todo }) {
     mutationFn: (updatedTodo: Partial<Todo>) =>
       updateTodoApi(todo.id, updatedTodo),
 
-    onMutate: async (updatedTodo) => {
-      // Cancel pending refetches
-      await queryClient.cancelQueries(["todos"]);
-
-      // Snapshot current state
-      const previousTodos = queryClient.getQueryData(["todos"]);
-
-      // Optimistic update
-      queryClient.setQueryData(["todos"], (old: Todo[]) =>
-        old?.map((t) => (t.id === todo.id ? { ...t, ...updatedTodo } : t))
-      );
-
-      // Return context for rollback
-      return { previousTodos };
-    },
-
-    onError: (err, updatedTodo, context) => {
-      // Rollback on error
-      queryClient.setQueryData(["todos"], context?.previousTodos);
-    },
-
-    onSettled: () => {
+    // Note: onMutate and onSettled are not implemented in this library
+    // This is a conceptual example showing how optimistic updates would work
+    onSuccess: async (data) => {
       // Refetch to sync with server
-      queryClient.invalidateQueries(["todos"]);
+      await queryClient.invalidateQueries(["todos"]);
+    },
+
+    onError: (error) => {
+      // Handle error
+      console.error("Failed to update todo:", error);
     },
   });
 
   const handleToggle = () => {
+    // For optimistic updates, you would handle them manually:
+    // 1. Update local state optimistically
+    // 2. Perform mutation
+    // 3. Revert on error or sync on success
     updateTodo.mutate({ completed: !todo.completed });
   };
 
@@ -484,7 +481,7 @@ function UpdateTodo({ todo }: { todo: Todo }) {
     </div>
   );
 }
-```
+````
 
 ### Parallel Queries
 
@@ -515,11 +512,17 @@ function Dashboard() {
         <div>🔄 Loading data... ({isFetching} active queries)</div>
       )}
 
-      <UserSection user={userQuery.data} loading={userQuery.isLoading} />
-      <StatsSection stats={statsQuery.data} loading={statsQuery.isLoading} />
+      <UserSection
+        user={userQuery.data}
+        loading={userQuery.status === "loading"}
+      />
+      <StatsSection
+        stats={statsQuery.data}
+        loading={statsQuery.status === "loading"}
+      />
       <NotificationSection
         notifications={notificationsQuery.data}
-        loading={notificationsQuery.isLoading}
+        loading={notificationsQuery.status === "loading"}
       />
     </div>
   );
@@ -573,8 +576,15 @@ function SearchResults() {
         placeholder="Search..."
       />
 
-      {searchQuery.isLoading && <div>Searching...</div>}
-      {searchQuery.error && <div>Error: {searchQuery.error.message}</div>}
+      {searchQuery.status === "loading" && <div>Searching...</div>}
+      {searchQuery.error && (
+        <div>
+          Error:{" "}
+          {searchQuery.error instanceof Error
+            ? searchQuery.error.message
+            : String(searchQuery.error)}
+        </div>
+      )}
 
       {searchQuery.data && (
         <div>
@@ -665,7 +675,10 @@ light-query includes comprehensive testing utilities:
 ### Testing Utilities
 
 ```tsx
-import { createMockQueryClient, waitForQuery } from "light-query/test-utils";
+import {
+  createMockQueryClient,
+  waitForQuery,
+} from "@nastmz/light-query/test-utils";
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@nastmz/light-query";
 
@@ -719,12 +732,11 @@ light-query is optimized for performance:
 
 ### Built-in Optimizations
 
-- **Deduplication**: Identical requests are automatically deduplicated
+- **Concurrent Request Prevention**: Prevents multiple simultaneous requests for the same query
 - **Batch Notifications**: Multiple updates are batched to prevent unnecessary re-renders
 - **Automatic Cancellation**: Stale requests are cancelled automatically
 - **Smart Cleanup**: Cache is cleaned automatically based on `cacheTime`
 - **Lazy Loading**: Queries only execute when needed
-- **Structural Sharing**: Data is structurally shared to prevent re-renders
 
 ### Best Practices
 
@@ -800,11 +812,13 @@ light-query/
 ├── src/
 │   ├── hooks/           # Main hooks
 │   ├── core/            # Core logic
+│   ├── react/           # React components
 │   ├── types/           # TypeScript types
 │   ├── utils/           # Utilities
+│   ├── mocks/           # MSW mocks for testing
+│   ├── test-utils/      # Testing utilities
 │   └── index.ts         # Main exports
 ├── __tests__/           # Tests
-│   └── test-utils/      # Testing utilities
 ├── examples/            # Usage examples
 ├── package.json
 ├── tsconfig.json
@@ -827,8 +841,8 @@ This library demonstrates comprehensive implementation of:
 ### Advanced Implementation Details
 
 - **Observer Pattern**: Reactive subscription system with efficient change detection
-- **Cache Management**: LRU cache with TTL, intelligent invalidation strategies
-- **Performance Optimization**: Request deduplication, batching, and structural sharing
+- **Cache Management**: Simple cache with TTL, intelligent invalidation strategies
+- **Performance Optimization**: Concurrent request prevention, batching, and automatic cleanup
 - **Error Handling**: Custom error types with recovery strategies and user-friendly messages
 - **Configuration Systems**: Flexible, typed configuration with sensible defaults
 

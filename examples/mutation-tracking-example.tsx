@@ -1,6 +1,6 @@
 // examples/mutation-tracking-example.tsx
 import React, { useState } from 'react'
-import { QueryClient, QueryClientProvider, useQuery, useMutation, useIsMutating } from 'light-query'
+import { QueryClient, QueryClientProvider, useQuery, useMutation, useIsMutating } from '@nastmz/light-query'
 
 const queryClient = new QueryClient()
 
@@ -21,7 +21,7 @@ const addTodo = async (title: string) => {
 const TodoList: React.FC = () => {
   const [newTodo, setNewTodo] = useState('')
   
-  const { data: todos, isLoading, error } = useQuery({
+  const { data: todos, status, error } = useQuery({
     queryKey: ['todos'],
     queryFn: fetchTodos,
     staleTime: 5000
@@ -44,8 +44,8 @@ const TodoList: React.FC = () => {
     }
   }
   
-  if (isLoading) return <div>Loading todos...</div>
-  if (error) return <div>Error: {error.message}</div>
+  if (status === "loading") return <div>Loading todos...</div>
+  if (error) return <div>Error: {error instanceof Error ? error.message : String(error)}</div>
   
   return (
     <div>
@@ -89,7 +89,7 @@ const TodoList: React.FC = () => {
       
       {addTodoMutation.status === 'error' && (
         <div style={{ color: 'red', marginTop: '1rem' }}>
-          Error adding todo: {addTodoMutation.error?.message}
+          Error adding todo: {addTodoMutation.error instanceof Error ? addTodoMutation.error.message : String(addTodoMutation.error)}
         </div>
       )}
     </div>
